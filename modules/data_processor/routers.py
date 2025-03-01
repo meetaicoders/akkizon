@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import pandas as pd
 import logging
-from app.modules.data_processor import (
+from modules.data_processor import (
     DatasetHandler,
     DataVisualizationService,
     ConversionRequest,
