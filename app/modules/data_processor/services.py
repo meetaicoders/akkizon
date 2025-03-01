@@ -1,4 +1,4 @@
-from data_processor import DatasetHandler
+from app.modules.data_processor.handlers import DatasetHandler
 
 """
 Data Visualization Service
@@ -14,8 +14,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 class DataVisualizationService:
-    def __init__(self, processor: DataPreProcessor = None):
-        self.processor = processor or DataPreProcessor()
+    def __init__(self, processor: DatasetHandler):
+        self.processor = processor
         
     def get_chart_data(self, raw_data: str) -> Dict[str, Any]:
         """
