@@ -1,4 +1,3 @@
-from app.modules.data_processor.handlers import DatasetHandler
 
 """
 Data Visualization Service
@@ -8,8 +7,8 @@ Converts processed data into frontend-friendly JSON format for charting.
 
 from typing import Dict, Any
 import pandas as pd
-from app.modules.data_processor.services import DataPreProcessor
 import logging
+from .handlers import DatasetHandler
 
 logger = logging.getLogger(__name__)
 

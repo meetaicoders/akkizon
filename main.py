@@ -1,8 +1,8 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from app.core.config import settings
-from app.core.adapter import MultiProviderClient, Provider, ChatRequest, ChatMessage
+from core.config import settings
+from core.adapter import MultiProviderClient, Provider, ChatRequest, ChatMessage
 import os
 
 def test_openai():

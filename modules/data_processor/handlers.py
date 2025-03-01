@@ -6,8 +6,8 @@ Uses configured AI providers for intelligent data transformation tasks.
 
 from typing import List, Dict, Optional
 import pandas as pd
-from app.core.adapter import MultiProviderClient, ChatRequest, ChatMessage, PROVIDERS
-from app.core.config import settings
+from core.adapter import MultiProviderClient, ChatRequest, ChatMessage, PROVIDERS
+from core.config import settings
 import logging
 from data_processor.schemas import DataFrameRow
 
