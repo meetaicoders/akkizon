@@ -1,17 +1,16 @@
 # External imports
 import boto3
 import os
-import logging
 import uuid
 from typing import Dict, Any
 
 # Internal imports
 from data_processor.models import Dataset, DatasetAddRequest, ProjectAddRequest
 from utils.helper_funcs import get_supabase_client
+from core.logger import setup_logger
+from core.constants import DATASET_BUCKET_NAME
+logger = setup_logger(__name__)
 
-logger = logging.getLogger(__name__)
-
-BUCKET_NAME = "datasets"  # Instead of self.bucket_name
 
 class DatasetClient:
     """
@@ -26,7 +25,7 @@ class DatasetClient:
     """
     def __init__(self, table_name: str = "datasets"):
         self.client = get_supabase_client()
-        self.bucket_name = BUCKET_NAME
+        self.bucket_name = DATASET_BUCKET_NAME
         self.s3 = boto3.client("s3")
         self.table_name = table_name
     def upload_to_bucket(self, file: str) -> str:
