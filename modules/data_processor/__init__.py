@@ -1,19 +1,3 @@
-from .handlers import DatasetHandler
-from .services import DataVisualizationService
-from .schemas import (
-    ConversionRequest, 
-    FilterRequest, 
-    NormalizationRequest, 
-    PipelineRequest,
-    DataFrameRow
-)
+from .routers import router as data_processor_router
 
-__all__ = [
-    "DatasetHandler",
-    "DataVisualizationService",
-    "ConversionRequest",
-    "FilterRequest",
-    "NormalizationRequest",
-    "PipelineRequest",
-    "DataFrameRow"
-]
+__all__ = ["data_processor_router"]

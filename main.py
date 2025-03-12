@@ -1,36 +1,52 @@
-from dotenv import load_dotenv
-load_dotenv()
+# external imports
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
+# internal imports  
+from modules.data_processor import data_processor_router
 from core.config import settings
-from core.adapter import MultiProviderClient, Provider, ChatRequest, ChatMessage
-import os
 
-def test_openai():
-    # Get API key from environment (or replace with your key)
-    api_key = settings.openai_api_key
-    
-    # Initialize client
-    client = MultiProviderClient(
-        provider=Provider.OPENAI,
-        api_key=api_key
-    )
-    
-    # Create test request
-    request = ChatRequest(
-        model="gpt-4",
-        messages=[
-            ChatMessage(role="system", content="Hello, how are you today?")
-        ]
-    )
-    
-    try:
-        # Get completion
-        response = client.chat_completion(request)
-        print("\nAI Response:")
-        print(response['content'])
-        print(f"\nRequest ID: {response['request_id']}")
-    except Exception as e:
-        print(f"\nError: {str(e)}")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
 
+# Initialize the FastAPI application
+app = FastAPI(
+    title="Akkizon API",
+    description="API for Akkizon application",
+    version="0.1.0",
+    contact={
+        "name": "Meet Ai Coders",
+    },
+    lifespan=lifespan,
+)
+
+# Include your router
+app.include_router(data_processor_router)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Health check endpoint
+@app.get("/health", tags=["system"])
+async def health_check():
+    return {"status": "healthy"}
+
+# Main entry point
 if __name__ == "__main__":
-    test_openai()
+    import uvicorn
+    
+    uvicorn.run(
+        app,
+        host=settings.host,
+        port=settings.port,
+        reload=settings.reload,
+        log_level=settings.log_level,
+    )
