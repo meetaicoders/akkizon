@@ -8,14 +8,27 @@ from modules.data_processor import (
     ConversionRequest,
     FilterRequest,
     NormalizationRequest,
-    PipelineRequest
+    PipelineRequest,
+    DatasetUploadRequest
 )
+from modules.data_processor.clients import DatasetClient
 
 
 router = APIRouter(prefix="/data", tags=["data_processing"])
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+@router.post("/dataset_upload")
+async def dataset_upload(request: DatasetUploadRequest):
+    """
+    Upload a dataset to the database.
+    """
+    try:
+        client = DatasetClient()
+        return client.upload_dataset(request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chart-data")
 async def get_visualization_data(raw_data: str):
