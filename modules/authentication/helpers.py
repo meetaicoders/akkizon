@@ -5,8 +5,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHea
 from typing import Optional
 
 # internal imports
-from modules.authentication.clients import SupabaseAuthClient
-from modules.authentication.handlers import AuthenticationHandler
+from modules.authentication.clients import SupabaseAuthClient, OrganizationClient
+from modules.authentication.handlers import AuthenticationHandler, OrganizationHandler
 from modules.authentication.schemas import AuthenticatedUser
 from core.logger import setup_logger
 
@@ -19,6 +19,9 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 @lru_cache()
 def get_auth_handler() -> AuthenticationHandler:
     return AuthenticationHandler(SupabaseAuthClient())
+
+def get_organization_handler() -> OrganizationHandler:
+    return OrganizationHandler(OrganizationClient())
 
 def get_authenticated_user(
     auth_header: Optional[HTTPAuthorizationCredentials] = Depends(auth_scheme),
@@ -61,3 +64,46 @@ def get_authenticated_user(
     except Exception as e:
         logger.error(f"Authentication failed: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error during authentication")
+
+def get_authenticated_user_without_org(
+    auth_header: Optional[HTTPAuthorizationCredentials] = Depends(auth_scheme),
+    api_key: Optional[str] = Depends(api_key_header)
+) -> AuthenticatedUser:
+    """
+    Authenticate user using either Bearer token or API key.
+    This version does not require organization ID for Bearer token authentication.
+    
+    Args:
+        auth_header: Optional Bearer token
+        api_key: Optional API key
+        
+    Returns:
+        AuthenticatedUser: Contains authenticated user information
+        
+    Raises:
+        HTTPException: If authentication fails
+    """
+    auth_handler = get_auth_handler()
+    
+    try:
+        # Use Bearer token if present
+        if auth_header:
+            return auth_handler.authenticate_without_org(
+                access_token=auth_header.credentials
+            )
+        
+        # Use API key if present
+        if api_key:
+            return auth_handler.authenticate(api_key=api_key)
+            
+        raise HTTPException(status_code=401, detail="No authentication credentials provided")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Authentication failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error during authentication")
+
+def add_organization(user: AuthenticatedUser):
+    organization_handler = get_organization_handler()
+    organization_handler.add_organization(user)

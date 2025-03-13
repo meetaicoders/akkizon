@@ -5,29 +5,10 @@ from pydantic_settings import BaseSettings
 from pydantic import Field
 import os
 from typing import List
-
-cors_origins_env = os.getenv("CORS_ORIGINS")
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
-    # FastAPI Settings
-    port: int = Field(
-        default=int(os.getenv("PORT", 8000)),
-        description="Port number for the FastAPI server"
-    )
-    host: str = Field(
-        default=os.getenv("HOST", "0.0.0.0"),
-        description="Host address for the FastAPI server"
-    )
-    debug: bool = Field(
-        default=bool(os.getenv("DEBUG", True)),
-        description="Debug mode flag"
-    )
-    reload: bool = Field(
-        default=bool(os.getenv("RELOAD", True)),
-        description="Auto-reload mode flag"
-    )
-
     # API Keys
     openai_api_key: str = Field(
         default=os.getenv("OPENAI_API_KEY", ""),
@@ -44,9 +25,16 @@ class Settings(BaseSettings):
 
     # CORS Settings
     cors_origins: List[str] = Field(
-    default=cors_origins_env.split(",") if cors_origins_env else [],
-    description="Allowed origins for CORS"
+        default=os.getenv("CORS_ORIGINS", ""),
+        description="Allowed origins for CORS",
     )
+
+    @field_validator("cors_origins")
+    @classmethod
+    def parse_cors_origins(cls, v):
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(",")]
+        return v
 
     # Database Settings
     supabase_url: str = Field(

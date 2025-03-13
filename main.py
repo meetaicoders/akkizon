@@ -5,8 +5,8 @@ from contextlib import asynccontextmanager
 
 # internal imports  
 from modules.data_processor import data_processor_router
+from modules.authentication import authentication_router
 from core.config import settings
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
@@ -23,8 +23,8 @@ app = FastAPI(
 )
 
 # Include your router
-app.include_router(data_processor_router)
-
+# app.include_router(data_processor_router)   
+app.include_router(authentication_router)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -43,10 +43,4 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     
-    uvicorn.run(
-        app,
-        host=settings.host,
-        port=settings.port,
-        reload=settings.reload,
-        log_level=settings.log_level,
-    )
+    uvicorn.run(app)

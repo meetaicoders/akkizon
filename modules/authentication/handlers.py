@@ -14,8 +14,8 @@ from fastapi import HTTPException
 from typing import Optional
 
 # internal imports
-from modules.authentication.clients import SupabaseAuthClient
-from modules.authentication.schemas import  AuthenticatedUser
+from modules.authentication.clients import SupabaseAuthClient, OrganizationClient
+from modules.authentication.schemas import  AuthenticatedUser, Organization
 from core.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -32,6 +32,7 @@ class AuthenticationHandler:
 
     Methods:
         authenticate: Authenticate a user using the provided token
+        authenticate_without_org: Authenticate a user using the provided token without organization ID requirement
     """
 
     def __init__(self, auth_client: SupabaseAuthClient):
@@ -77,3 +78,35 @@ class AuthenticationHandler:
             return self.auth_client.get_user_from_bearer_token(access_token, organization_id)
 
         raise HTTPException(status_code=401, detail="Authentication required")
+
+    def authenticate_without_org(
+        self,
+        access_token: str
+    ) -> AuthenticatedUser:
+        """
+        Authenticates the user based on Bearer token without organization ID requirement.
+        
+        Args:
+            access_token: Bearer token for authentication
+            
+        Returns:
+            AuthenticatedUser: Contains authenticated user information
+            
+        Raises:
+            HTTPException: If authentication fails
+        """
+        try:
+            user = self.auth_client.get_user_from_bearer_token(access_token, None)
+            return user
+        except Exception as e:
+            raise HTTPException(status_code=401, detail="Authentication failed")
+
+class OrganizationHandler:
+    def __init__(self, organization_client: OrganizationClient):
+        self.organization_client = organization_client
+
+    def generate_organization_for_user(self, user: AuthenticatedUser, organization: Organization):
+        return self.organization_client.generate_organization_for_user(user, organization)
+    
+    def get_user_organizations(self, user: AuthenticatedUser):
+        return self.organization_client.get_user_organizations(user)
