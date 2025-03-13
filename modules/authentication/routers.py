@@ -1,5 +1,10 @@
 from fastapi import APIRouter, Depends, Body, HTTPException
-from modules.authentication.helpers import get_authenticated_user, get_authenticated_user_without_org, get_organization_handler
+from modules.authentication.helpers import (
+    get_authenticated_user, 
+    get_authenticated_user_without_org, 
+    get_organization_handler,
+    get_auth_handler
+)
 from modules.authentication.schemas import (
     AuthenticatedUser,
     Organization
@@ -33,3 +38,12 @@ def get_user_organizations(
         return organizations
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post('/sign-in')
+def sign_in(
+    email: str = Body(...),
+    password: str = Body(...)
+):
+    auth_handler = get_auth_handler().auth_client.sign_in(email=email, password=password)
+    return auth_handler
+    

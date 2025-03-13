@@ -22,7 +22,9 @@ from modules.authentication.schemas import (
     AuthenticatedUser, 
     Organization, 
     UserOrganization, 
-    APIKey
+    APIKey,
+    BearerToken,
+    OrganizationWithRole
 )
 
 logger = setup_logger(__name__)
@@ -106,16 +108,38 @@ class SupabaseAuthClient(AuthClientBase):
         except Exception as e:
             logger.error(f"Multi-Organization Authentication Failed: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to verify token")
-
+        
+    def sign_in(self, email: str, password: str) -> BearerToken:
+        """Sign in a user and return access/refresh tokens."""
+        try:
+            response = self.client.auth.sign_in_with_password({
+                "email": email,
+                "password": password
+            })
+            
+            # Extract access and refresh tokens from the session
+            access_token = response.session.access_token
+            refresh_token = response.session.refresh_token
+            
+            return BearerToken(
+                access_token=access_token,
+                refresh_token=refresh_token
+            )
+        except Exception as e:
+            logger.error(f"Failed to sign in: {str(e)}", exc_info=True)
+            raise
+        
 class OrganizationClient:
     """
     Client for managing organizations.
     """
     def __init__(self):
+        logger.info(f"Initializing OrganizationClient")
         self.client: Client = create_client(settings.supabase_url, settings.supabase_key)
 
     def generate_organization_for_user(self, user: AuthenticatedUser, organization: Organization) -> Organization:
         """Generate an organization for a user."""
+        logger.info(f"Generating organization for user: {user.user_id}")
         new_organization = self.add_organization(organization)  # Capture the returned organization
         self.add_user_to_organization(user, new_organization)  # Use the new organization
         self.generate_api_key(user, new_organization)  # Use the new organization
@@ -124,6 +148,7 @@ class OrganizationClient:
     def add_organization(self, organization: Organization) -> Organization:
         """Add an organization to the database."""
         try:
+            logger.info(f"Adding organization: {organization.name}")
             response = self.client.table("organizations").insert({
                 "name": organization.name,
             }).execute()
@@ -136,6 +161,8 @@ class OrganizationClient:
     def add_user_to_organization(self, user: AuthenticatedUser, organization: Organization) -> UserOrganization:
         """Add a user to the specified organization."""
         try:
+            logger.info(f"Adding {user.user_id} to {organization.id}")
+
             response = self.client.table("user_organizations").insert({
                 "user_id": user.user_id,
                 "organization_id": organization.id
@@ -148,6 +175,7 @@ class OrganizationClient:
     
     def generate_api_key(self, user: AuthenticatedUser, organization: Organization) -> APIKey:
         """Generate an API key for the user in the specified organization."""
+        logger.info(f"Generating API key for {user.user_id}")
         characters = string.ascii_letters + string.digits
         api_key = ''.join(secrets.choice(characters) for _ in range(32))  # 32 characters long
         try:
@@ -162,11 +190,31 @@ class OrganizationClient:
             logger.error(f"Failed to generate API key: {str(e)}", exc_info=True)
             raise
     
-    def get_user_organizations(self, user: AuthenticatedUser) -> list[Organization]:
-        """Get all organizations for a user."""
+    def get_user_organizations(self, user: AuthenticatedUser):
+        """Get all organizations for a user as a list with roles."""
         try:
-            response = self.client.table("user_organizations").select("*").eq("user_id", user.user_id).execute()
-            organizations = [Organization(**org) for org in response.data]
+            logger.info(f"Getting organizations for {user.user_id}")
+            # Use a join to fetch both user_organizations and organizations data
+            response = self.client.table("user_organizations").select(
+                """
+                organization_id,
+                role,
+                organizations (id, name, created_at, updated_at)
+                """
+            ).eq("user_id", str(user.user_id)).execute()
+            
+            # Build the list of organizations with the role included
+            organizations = [
+                OrganizationWithRole(
+                    id=org["organizations"]["id"],
+                    name=org["organizations"]["name"],
+                    role=org["role"],
+                    created_at=org["organizations"]["created_at"],
+                    updated_at=org["organizations"]["updated_at"]
+                )
+                for org in response.data
+            ]
+            
             return organizations
         except Exception as e:
             logger.error(f"Failed to get user organizations: {str(e)}", exc_info=True)

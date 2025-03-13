@@ -102,8 +102,8 @@ class AuthenticationHandler:
             raise HTTPException(status_code=401, detail="Authentication failed")
 
 class OrganizationHandler:
-    def __init__(self):
-        self.organization_client = OrganizationClient()
+    def __init__(self, organization_client: OrganizationClient):
+        self.organization_client = organization_client
 
     def generate_organization_for_user(self, user: AuthenticatedUser, organization: Organization):
         return self.organization_client.generate_organization_for_user(user, organization)
