@@ -61,7 +61,7 @@ class SupabaseAuthClient(AuthClientBase):
             logger.error(f"Failed to authenticate API key: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to verify API key")
     
-    def get_user_from_bearer_token(self, access_token: str, organization_id: str) ->  AuthenticatedUser:
+    def get_user_from_bearer_token(self, access_token: str, organization_id: str = None) ->  AuthenticatedUser:
         """Authenticate user via Bearer Token and check if they belong to the requested organization.
         
         Args:
@@ -81,16 +81,18 @@ class SupabaseAuthClient(AuthClientBase):
                 raise HTTPException(status_code=401, detail="Invalid Bearer Token")
 
             user_id = user.id
-            user_organization = (
-                self.client.table("user_organizations")
-                .select("*")
-                .eq("user_id", user_id)
-                .eq("organization_id", organization_id)
-                .execute()
-            )
-            if not user_organization.data:
-                logger.warning(f"User {user_id} does not belong to organization {organization_id}")
-                raise HTTPException(status_code=401, detail="Unauthorized Organization Access")
+
+            if organization_id is not None:
+                user_organization = (
+                    self.client.table("user_organizations")
+                    .select("*")
+                    .eq("user_id", user_id)
+                    .eq("organization_id", organization_id)
+                    .execute()
+                )
+                if not user_organization.data:
+                    logger.warning(f"User {user_id} does not belong to organization {organization_id}")
+                    raise HTTPException(status_code=401, detail="Unauthorized Organization Access")
             
             return AuthenticatedUser(success=True, user_id=user_id, organization_id=organization_id)
         except Exception as e:
