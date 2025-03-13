@@ -14,8 +14,8 @@ from fastapi import HTTPException
 from typing import Optional
 
 # internal imports
-from modules.authentication.clients import SupabaseAuthClient
-from modules.authentication.schemas import  AuthenticatedUser
+from modules.authentication.clients import SupabaseAuthClient, OrganizationClient
+from modules.authentication.schemas import  AuthenticatedUser, Organization
 from core.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -100,3 +100,13 @@ class AuthenticationHandler:
             return user
         except Exception as e:
             raise HTTPException(status_code=401, detail="Authentication failed")
+
+class OrganizationHandler:
+    def __init__(self):
+        self.organization_client = OrganizationClient()
+
+    def generate_organization_for_user(self, user: AuthenticatedUser, organization: Organization):
+        return self.organization_client.generate_organization_for_user(user, organization)
+    
+    def get_user_organizations(self, user: AuthenticatedUser):
+        return self.organization_client.get_user_organizations(user)

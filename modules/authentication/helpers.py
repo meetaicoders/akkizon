@@ -5,8 +5,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHea
 from typing import Optional
 
 # internal imports
-from modules.authentication.clients import SupabaseAuthClient
-from modules.authentication.handlers import AuthenticationHandler
+from modules.authentication.clients import SupabaseAuthClient, OrganizationClient
+from modules.authentication.handlers import AuthenticationHandler, OrganizationHandler
 from modules.authentication.schemas import AuthenticatedUser
 from core.logger import setup_logger
 
@@ -19,6 +19,9 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 @lru_cache()
 def get_auth_handler() -> AuthenticationHandler:
     return AuthenticationHandler(SupabaseAuthClient())
+
+def get_organization_handler() -> OrganizationHandler:
+    return OrganizationHandler(OrganizationClient())
 
 def get_authenticated_user(
     auth_header: Optional[HTTPAuthorizationCredentials] = Depends(auth_scheme),
@@ -100,3 +103,7 @@ def get_authenticated_user_without_org(
     except Exception as e:
         logger.error(f"Authentication failed: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error during authentication")
+
+def add_organization(user: AuthenticatedUser):
+    organization_handler = get_organization_handler()
+    organization_handler.add_organization(user)
