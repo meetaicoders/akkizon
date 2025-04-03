@@ -5,7 +5,6 @@ from pydantic_settings import BaseSettings
 from pydantic import Field
 import os
 from typing import List
-from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -22,19 +21,6 @@ class Settings(BaseSettings):
         default=os.getenv("GROQ_API_KEY", ""),
         description="Groq API key for their accelerated AI models"
     )
-
-    # CORS Settings
-    cors_origins: List[str] = Field(
-        default=os.getenv("CORS_ORIGINS", ""),
-        description="Allowed origins for CORS",
-    )
-
-    @field_validator("cors_origins")
-    @classmethod
-    def parse_cors_origins(cls, v):
-        if isinstance(v, str):
-            return [item.strip() for item in v.split(",")]
-        return v
 
     # Database Settings
     supabase_url: str = Field(

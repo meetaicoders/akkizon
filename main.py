@@ -28,7 +28,7 @@ app.include_router(authentication_router)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=["https://app.akkizon.ai", "http://localhost:3000", "https://akkizon-ui.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
