@@ -25,6 +25,7 @@ app = FastAPI(
 # Include your router
 # app.include_router(data_processor_router)   
 app.include_router(authentication_router)
+app.include_router(data_processor_router)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,

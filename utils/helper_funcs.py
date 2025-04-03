@@ -43,7 +43,7 @@ def get_anon_supabase_client() -> Client:
     """
     return create_client(settings.supabase_url, settings.supabase_key)
 
-def get_supabase_client(api_key: str) -> Client:
+def get_supabase_client() -> Client:
     """
     Get the supabase client from the API key.
     """

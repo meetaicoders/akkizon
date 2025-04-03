@@ -58,14 +58,18 @@ class SupabaseAuthClient(AuthClientBase):
             HTTPException: If API key is invalid
         """
         try:
+            logger.info(f"Getting user from api key")
             response = self.client.table("api_keys").select("user_id, organization_id").eq("key", api_key).execute()
             if not response.data:
-                logger.warning(f"Invalid API key: {api_key}")
+                logger.warning(f"Invalid API key provided")
                 raise HTTPException(status_code=401, detail="Invalid API key")
+            user_id = response.data[0]["user_id"]
+            organization_id = response.data[0]["organization_id"]
+            logger.info(f"Authenticated user: {user_id} with organization: {organization_id}")
             return AuthenticatedUser(
                 success=True,
-                user_id=response.data[0]["user_id"],
-                organization_id=response.data[0]["organization_id"],
+                user_id=user_id,
+                organization_id=organization_id,
             )
         except Exception as e:
             logger.error(f"Failed to authenticate API key: {str(e)}", exc_info=True)
@@ -85,13 +89,13 @@ class SupabaseAuthClient(AuthClientBase):
             HTTPException: If Bearer token is invalid or user does not belong to the organization
         """
         try:
+            logger.info(f"Getting user from bearer token")
             user = self.client.auth.get_user(access_token).user
             if not user:
-                logger.warning("Invalid Bearer Token")
+                logger.warning("Invalid Bearer Token provided")
                 raise HTTPException(status_code=401, detail="Invalid Bearer Token")
 
             user_id = user.id
-
             if organization_id is not None:
                 user_organization = (
                     self.client.table("user_organizations")
@@ -103,7 +107,7 @@ class SupabaseAuthClient(AuthClientBase):
                 if not user_organization.data:
                     logger.warning(f"User {user_id} does not belong to organization {organization_id}")
                     raise HTTPException(status_code=401, detail="Unauthorized Organization Access")
-            
+            logger.info(f"Authenticated user: {user_id} with organization: {organization_id}")
             return AuthenticatedUser(success=True, user_id=user_id, organization_id=organization_id)
         except Exception as e:
             logger.error(f"Multi-Organization Authentication Failed: {str(e)}", exc_info=True)
