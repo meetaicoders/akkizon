@@ -12,6 +12,7 @@ from fastapi import HTTPException
 
 # Internal imports
 from modules.data_processor.models import Dataset, DatasetAddRequest, ProjectAddRequest
+from modules.authentication.clients import BigDataOAuthClient
 from modules.data_processor.schemas import (
     AddProjectRequest, 
     HubSpotConfigSchema, 
@@ -213,147 +214,43 @@ class ProjectClient:
         return f"Untitled Project {len(all_projects) + 1}"
 
 class ConnectorClient:
-    def __init__(self, table_name: str = "data_connectors"):
+    def __init__(self, data_connector_table: str = "data_connectors", user_connector_table: str = "user_connectors"):
         self.client = get_supabase_client()
-        self.table_name = table_name
-        self.user_connector_table_name = "user_connectors"
+        self.data_connector_table  = data_connector_table
+        self.user_connector_table = user_connector_table
 
     def fetch_default_connectors(self) -> List[Dict[str, Any]]:
-        response = self.client.table(self.table_name).select("*").execute()
+        response = self.client.table(self.data_connector_table).select("*").execute()
         return response.data
     
-    def fetch_connector_config(self, connector_id: str) -> Dict[str, Any]:
-        """
-        Fetch the configuration for a specific connector by ID.
-        """
-        response = self.client.table(self.table_name).select("*").eq("id", connector_id).execute()
-        if not response.data:
-            raise ValueError(f"Connector with ID {connector_id} not found")
-        return response.data[0]
-    
-    def add_connector_for_user(self, user_id: str, connector_id: str, organization_id: str, project_id: str) -> Any:
-        """
-        Add a connector for a user.
-        """
-        response = self.client.table(self.user_connector_table_name).insert({
-            "user_id": user_id,
-            "connector_id": connector_id,
-            "organization_id": organization_id,
-            "project_id": project_id
-        }).execute()
-        return response.data
-    
+    def fetch_all_connectors_for_user(self, user_id: str, organization_id: str, project_id: str) -> List[Dict[str, Any]]:
+        try:
+            response = (
+                self.client.table(self.user_connector_table)
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("organization_id", organization_id)
+                .eq("project_id", project_id)
+                .execute()
+            )
+            return response.data
+        except Exception as e:
+            logger.error(f"Failed to fetch connectors: {str(e)}")
+            raise e
 
 
-class HubSpotConnector(ConnectorClient):
-    def __init__(self):
-        super().__init__()
-        # self.connector_id = connector_id
-        # self.connector_config = self.fetch_connector_config(self.connector_id)
-        self.oauth_client = OAuth2Client(
+class HubSpotConnector(BigDataOAuthClient):
+    def __init__(self, connector_id: str, organization_id: str, user_id: str, project_id: str):
+        super().__init__(
+            client=get_supabase_client(),
+            connector_id=connector_id, 
+            organization_id=organization_id, 
+            user_id=user_id, 
+            project_id=project_id,
             client_id=settings.hubspot_client_id,
             client_secret=settings.hubspot_client_secret,
+            redirect_uri=settings.hubspot_redirect_uri
         )
-    async def initiate_oauth_flow(self) -> str:
-        """Generate HubSpot OAuth URL with parameters in query string"""
-        # Generate a secure random state value
-        state = secrets.token_urlsafe(32)
-        
-        # Store the state for CSRF protection
-        # await self.store_oauth_state(state)
-        
-        # Build query parameters
-        params = {
-            'client_id': settings.hubspot_client_id,
-            'redirect_uri': settings.hubspot_redirect_uri,
-            'scope': 'oauth',
-            'state': state
-        }
-        print(params)
-        
-        # Construct the full URL with query parameters
-        return f"https://app.hubspot.com/oauth/authorize?{urlencode(params)}"
-
-    async def store_oauth_state(self, state: str):
-        """Store OAuth state for CSRF protection"""
-        self.client.table("oauth_states").insert({
-            "state": state,
-            "connector_id": self.connector_id,
-            "created_at": datetime.now().isoformat()
-        }).execute()
-
-    def get_authorization_url(self, redirect_uri: str) -> str:
-        """Generate HubSpot OAuth authorization URL"""
-        return self.oauth_client.create_authorization_url(
-            'https://app.hubspot.com/oauth/authorize',
-            redirect_uri=redirect_uri,
-            scope=' '.join(self.connector_config.scopes)
-        )[0]
-
-    async def exchange_code(self, code: str) -> Dict[str, Any]:
-        """Exchange authorization code for tokens using HubSpot's token endpoint"""
-        token_url = "https://api.hubapi.com/oauth/v1/token"
-        
-        # Prepare the form data
-        data = {
-            "grant_type": "authorization_code",
-            "client_id": settings.hubspot_client_id,
-            "client_secret": settings.hubspot_client_secret,
-            "redirect_uri": settings.hubspot_redirect_uri,
-            "code": code
-        }
-        
-        # Set headers
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded;charset=utf-8"
-        }
-        
-        # Make the POST request
-        async with AsyncClient() as client:
-            response = await client.post(token_url, data=data, headers=headers)
-            
-            if response.status_code != 200:
-                error_data = response.json()
-                logger.error(f"Token exchange failed: {error_data}")
-                raise HTTPException(
-                    status_code=400,
-                    detail=error_data.get("message", "Failed to exchange authorization code")
-                )
-            
-            return response.json()
-
-    def store_tokens(self, oauth_token: HubSpotOAuthToken):
-        """Store tokens in database"""
-        self.client.table('oauth_tokens').upsert(oauth_token.dict()).execute()
-
-    def connect(self, user_id: str, organization_id: str, project_id: str):
-        """
-        Connect to HubSpot using the provided OAuth scopes.
-        """
-        # Implement HubSpot connection logic here
-        # Get the connector config
-        
-        connector_config = self.fetch_connector_config(self.connector_id)
-        # Implement HubSpot connection logic here
-        # Get the OAuth scopes
-        scopes = connector_config["scopes"]
-        # Implement HubSpot connection logic here
-        # Get the OAuth token
-        oauth_token = self.get_oauth_token(scopes)
-        # Implement HubSpot connection logic here
-        # Get the data
-        data = self.fetch_data()
-        # Implement HubSpot connection logic here
-        # Process the data
-        self.process_data(data)
-        pass
-
-    def fetch_data(self):
-        """
-        Fetch data from HubSpot.
-        """
-        # Implement data fetching logic here
-        pass
 
 class FileUploadConnector(ConnectorClient):
     def __init__(self, config: FileUploadConfigSchema):

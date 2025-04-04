@@ -13,6 +13,9 @@ from supabase import create_client, Client
 from fastapi import HTTPException
 import string
 import secrets
+from httpx import AsyncClient
+from urllib.parse import urlencode
+from typing import Dict, Any, List
 
 # internal imports
 from core.config import settings
@@ -223,4 +226,250 @@ class OrganizationClient:
         except Exception as e:
             logger.error(f"Failed to get user organizations: {str(e)}", exc_info=True)
             raise 
+
+class BigDataOAuthClient:
+    def __init__(self, client: Client, **kwargs):
+        """
+        Initializes an OAuth client for different integrations.
+
+        Args:
+        - client (Client): Database or API client (e.g., Supabase).
+        - kwargs: Optional OAuth parameters (client_id, client_secret, redirect_uri, etc.)
+        """
+        self.client = client
+        self.params = kwargs  # Store all optional parameters dynamically
+
+    def get_param(self, key: str, default=None):
+        """Helper to retrieve parameters safely.
+        
+        Args:
+            key: The key to retrieve
+            default: The default value to return if the key is not found
+            
+        Returns:
+            The value of the key or the default value if the key is not found
+        """
+        return self.params.get(key, default)
+    async def store_oauth_state(self, state: str):
+        """Store OAuth state for CSRF protection.
+        
+        Args:
+            state: The state to store
+        """
+        try:
+            self.client.table("oauth_states").insert({"state": state}).execute()
+        except Exception as e:
+            logger.error(f"Error storing OAuth state: {e}")
+
+    async def fetch_oauth_state(self, state: str) -> List[Dict[str, Any]]:
+        """Fetch OAuth state from the database.
+        
+        Args:
+            state: The state to fetch
+            
+        Returns:
+            The OAuth state from the database
+        """
+        response = self.client.table("oauth_states").select("*").eq("state", state).execute()
+        return response.data
     
+    async def initiate_oauth_flow(self) -> str:
+        """Generate OAuth URL with state for CSRF protection.
+        
+        Returns:
+            The OAuth URL
+        """
+        state = secrets.token_urlsafe(32)  # Generate secure random state
+        
+        # Store the state in the database for CSRF protection
+        await self.store_oauth_state(state)
+
+        params = {
+            'client_id': self.get_param("client_id"),
+            'redirect_uri': self.get_param("redirect_uri"),
+            'response_type': 'code',
+            'scope': self.get_param("scope", "oauth"),
+            'state': state
+        }
+
+        auth_url = f"{self.get_param('auth_url')}?{urlencode(params)}"
+        return auth_url
+    
+    async def exchange_code(self, 
+                            code: str, 
+                            state: str, 
+                            connector_id: str, 
+                            organization_id: str, 
+                            user_id: str, 
+                            project_id: str) -> Dict[str, Any]:
+        """Exchange authorization code for tokens.
+        Args:
+            code: The authorization code
+            state: The state to exchange
+            
+        Returns:
+            The tokens from the database
+        """
+        oauth_state = await self.fetch_oauth_state(state)
+        if not oauth_state:
+            raise Exception("Invalid OAuth state")
+        if not code:
+            raise Exception("No authorization code provided")
+        
+        token_url = self.get_param("token_url")
+        data = {
+            "grant_type": "authorization_code",
+            "client_id": self.get_param("client_id"),
+            "client_secret": self.get_param("client_secret"),
+            "redirect_uri": self.get_param("redirect_uri"),
+            "code": code
+        }
+
+        headers = {"Content-Type": "application/x-www-form-urlencoded;charset=utf-8"}
+        
+        async with AsyncClient() as client:
+            response = await client.post(token_url, data=data, headers=headers)
+            
+            if response.status_code != 200:
+                error_data = response.json()
+                logger.error(f"Token exchange failed: {error_data}")
+                raise Exception(f"Token exchange failed: {error_data}")
+
+            token_data = response.json()
+            await self.store_tokens(
+                token_data=token_data, 
+                connector_id=connector_id, 
+                organization_id=organization_id, 
+                user_id=user_id, 
+                project_id=project_id)
+            return token_data
+
+    async def store_tokens(self, 
+                           token_data: Dict[str, Any], 
+                           connector_id: str, 
+                           organization_id: str, 
+                           user_id: str, 
+                           project_id: str):
+        """Store access and refresh tokens in the database.
+        Args:
+            token_data: The tokens to store
+            connector_id: The connector ID
+            organization_id: The organization ID
+            user_id: The user ID
+            project_id: The project ID
+        """
+        if not token_data:
+            raise Exception("No token data provided")
+        if not connector_id:
+            raise Exception("No connector ID provided")
+        if not organization_id:
+            raise Exception("No organization ID provided")
+        if not user_id:
+            raise Exception("No user ID provided")
+        if not project_id:
+            raise Exception("No project ID provided")
+        
+        try:
+            self.client.table("user_connectors").upsert({
+                "connector_id": connector_id,
+                "organization_id": organization_id,
+                "user_id": user_id,
+                "project_id": project_id,
+                "access_token": token_data.get("access_token"),
+                "refresh_token": token_data.get("refresh_token"),
+                "expires_at": token_data.get("expires_at"),
+                "scope": token_data.get("scope")
+            }).execute()
+        except Exception as e:
+            logger.error(f"Error storing tokens: {e}")
+
+    async def refresh_access_token(self, 
+                                   connector_id: str, 
+                                   organization_id: str, 
+                                   user_id: str, 
+                                   project_id: str) -> Dict[str, Any]:
+        """Refresh access token using the refresh token.
+        
+        Args:
+            connector_id: The connector ID
+            organization_id: The organization ID
+            user_id: The user ID
+            project_id: The project ID
+        """
+        token_url = self.get_param("token_url")
+        # Fetch refresh token from the database
+        refresh_token = self.get_refresh_token(connector_id, organization_id, user_id, project_id)
+
+        if not refresh_token:
+            raise Exception("No refresh token found. Re-authentication required.")
+
+        data = {
+            "grant_type": "refresh_token",
+            "client_id": self.get_param("client_id"),
+            "client_secret": self.get_param("client_secret"),
+            "refresh_token": refresh_token
+        }
+
+        headers = {"Content-Type": "application/x-www-form-urlencoded;charset=utf-8"}
+
+        async with AsyncClient() as client:
+            response = await client.post(token_url, data=data, headers=headers)
+
+            if response.status_code != 200:
+                error_data = response.json()
+                logger.error(f"Token refresh failed: {error_data}")
+                raise Exception("Token refresh failed")
+
+            new_token_data = response.json()
+            await self.store_tokens(new_token_data)
+            return new_token_data
+    
+    async def get_access_token(self, 
+                               connector_id: str, 
+                               organization_id: str, 
+                               user_id: str, 
+                               project_id: str) -> Dict[str, Any]:
+        """Get the OAuth token for the user.
+        
+        Args:
+            connector_id: The connector ID
+            organization_id: The organization ID
+            user_id: The user ID
+            project_id: The project ID
+        """
+        response = (
+            self.client.table("user_connectors")
+            .select("access_token")
+            .eq("connector_id", connector_id)
+            .eq("organization_id", organization_id)
+            .eq("user_id", user_id)
+            .eq("project_id", project_id)
+            .single()
+            .execute()
+        )
+        return response.data[0]["access_token"]
+
+    async def get_refresh_token(self, 
+                                connector_id: str, 
+                                organization_id: str, 
+                                user_id: str, 
+                                project_id: str) -> Dict[str, Any]:
+        """Get the OAuth refresh token for the user.
+        
+        Args:
+            connector_id: The connector ID
+            organization_id: The organization ID
+            user_id: The user ID
+            project_id: The project ID
+        """
+        response = (
+            self.client.table("user_connectors")
+            .select("refresh_token")
+            .eq("connector_id", connector_id)
+            .eq("organization_id", organization_id)
+            .eq("user_id", user_id)
+            .eq("project_id", project_id)
+            .single()
+            .execute()
+        )
+        return response.data[0]["refresh_token"]
