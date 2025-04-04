@@ -5,24 +5,15 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from core.logger import setup_logger
 from modules.authentication.helpers import get_authenticated_user
 from modules.authentication.schemas import AuthenticatedUser
-from modules.data_processor.helpers import get_connector_client, get_project_client, get_hubspot_connector
-from modules.data_processor.clients import ConnectorClient, ProjectClient, HubSpotConnector
-from modules.data_processor.schemas import (
+from modules.projects.dependencies import get_project_client
+from modules.projects.clients import ProjectClient
+from modules.projects.schemas import (
     AddProjectRequest, 
     FetchProjectByIdRequest
 )
 
 logger = setup_logger(__name__)
-router = APIRouter(prefix="/v1/data", tags=["data_processor"])
-
-@router.post("/fetch-default-connectors")
-async def fetch_default_connectors(
-    user: AuthenticatedUser = Depends(get_authenticated_user), 
-    connector_client: ConnectorClient = Depends(get_connector_client)
-    ):
-    if not user.success:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    return connector_client.fetch_default_connectors()
+router = APIRouter(prefix="/v1/projects", tags=["projects"])
 
 @router.post("/add-project")
 async def add_project(
@@ -83,23 +74,3 @@ async def fetch_all_projects_by_organization(
     if not response:
         raise HTTPException(status_code=404, detail="No projects found")
     return response
-
-
-@router.post("/initiate-oauth-flow")
-async def initiate_oauth_flow(
-    user: AuthenticatedUser = Depends(get_authenticated_user),
-    hubspot_connector: HubSpotConnector = Depends(get_hubspot_connector)
-    ):
-    """Initiate HubSpot OAuth flow"""
-    return await hubspot_connector.initiate_oauth_flow()
-
-@router.get("/hubspot-oauth-callback")
-async def hubspot_oauth_callback(request: Request):
-    """Handle HubSpot OAuth callback"""
-    # Get code from request
-    code = request.query_params.get('code')
-    print(code)
-    if not code:
-        raise HTTPException(status_code=400, detail="Missing authorization code")
-    hubspot_connector = HubSpotConnector()
-    return await hubspot_connector.exchange_code(code)
