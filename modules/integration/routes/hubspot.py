@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from core.logger import setup_logger
 from modules.authentication.helpers import get_authenticated_user
 from modules.authentication.schemas import AuthenticatedUser
-from modules.integration.dependencies import get_hubspot_connector
+from modules.integration.dependencies import get_hubspot_connector_client
 from modules.integration.clients import HubSpotConnector
 from modules.integration.schemas import (
     HubSpotCallbackQueryParams
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/v1/integration/hubspot", tags=["hubspot"])
 @router.post("/initiate-oauth-flow")
 async def initiate_oauth_flow(
     user: AuthenticatedUser = Depends(get_authenticated_user),
-    hubspot_connector: HubSpotConnector = Depends(get_hubspot_connector)
+    hubspot_connector: HubSpotConnector = Depends(get_hubspot_connector_client)
     ):
     """Initiate HubSpot OAuth flow"""
     oauth_url = await hubspot_connector.initiate_oauth_flow()
@@ -31,7 +31,7 @@ async def initiate_oauth_flow(
 async def hubspot_oauth_callback(
     params: HubSpotCallbackQueryParams = Depends(),
     user: AuthenticatedUser = Depends(get_authenticated_user),
-    hubspot_connector: HubSpotConnector = Depends(get_hubspot_connector)
+    hubspot_connector: HubSpotConnector = Depends(get_hubspot_connector_client)
     ):
     """Handle HubSpot OAuth callback"""
     # Get code from request

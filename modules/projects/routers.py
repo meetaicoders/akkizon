@@ -47,7 +47,7 @@ async def fetch_project_by_id(
     if not user.success:
         raise HTTPException(status_code=401, detail="Unauthorized")
     try:
-        response = project_client.fetch_project_by_id(project_data.project_id)
+        response = project_client.fetch_project_by_id(project_data.project_id, user.user_id, user.organization_id)
     except Exception as e:
         logger.error(f"Failed to fetch project: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

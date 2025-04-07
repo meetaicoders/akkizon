@@ -4,9 +4,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 # internal imports  
-from modules.data_processor import data_processor_router
 from modules.authentication import authentication_router
 from core.config import settings
+from modules.integration import integration_router
+from modules.integration.routes import hubspot_router
+from modules.projects import projects_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
@@ -25,7 +27,9 @@ app = FastAPI(
 # Include your router
 # app.include_router(data_processor_router)   
 app.include_router(authentication_router)
-app.include_router(data_processor_router)
+app.include_router(integration_router)
+app.include_router(hubspot_router)
+app.include_router(projects_router)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
