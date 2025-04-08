@@ -5,11 +5,11 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHea
 from typing import Optional
 
 # internal imports
-from modules.authentication.clients import SupabaseAuthClient, OrganizationClient
+from modules.authentication.clients import SupabaseAuthClient, OrganizationClient, ProfileClient
 from modules.authentication.handlers import AuthenticationHandler, OrganizationHandler
 from modules.authentication.schemas import AuthenticatedUser
 from core.logger import setup_logger
-
+from utils.helper_funcs import get_supabase_client
 logger = setup_logger(__name__)
 
 # Security dependencies
@@ -107,3 +107,7 @@ def get_authenticated_user_without_org(
 def add_organization(user: AuthenticatedUser):
     organization_handler = get_organization_handler()
     organization_handler.add_organization(user)
+
+
+def get_profile_client() -> ProfileClient:
+    return ProfileClient(get_supabase_client())

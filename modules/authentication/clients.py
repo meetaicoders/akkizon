@@ -27,7 +27,8 @@ from modules.authentication.schemas import (
     UserOrganization, 
     APIKey,
     BearerToken,
-    OrganizationWithRole
+    OrganizationWithRole,
+    UserProfile,
 )
 
 logger = setup_logger(__name__)
@@ -473,3 +474,21 @@ class BigDataOAuthClient:
             .execute()
         )
         return response.data[0]["refresh_token"]
+    
+
+class ProfileClient:
+    def __init__(self, client: Client, table_name: str = "user_profiles"):
+        self.client = client
+        self.table_name = table_name
+
+    def fetch_user_profile(self, user_id: str) -> UserProfile:
+        response = self.client.table(self.table_name).select("*").eq("id", user_id).execute()
+        return response.data
+
+    def add_user_profile(self, user_id: str, user_name: str, default_organization: str) -> UserProfile:
+        response = self.client.table(self.table_name).insert({
+            "id": user_id,
+            "name": user_name,
+            "default_organization": default_organization
+        }).execute()
+        return response.data
