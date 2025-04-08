@@ -5,7 +5,6 @@ from pydantic_settings import BaseSettings
 from pydantic import Field
 import os
 from typing import List
-from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -22,19 +21,6 @@ class Settings(BaseSettings):
         default=os.getenv("GROQ_API_KEY", ""),
         description="Groq API key for their accelerated AI models"
     )
-
-    # CORS Settings
-    cors_origins: List[str] = Field(
-        default=os.getenv("CORS_ORIGINS", ""),
-        description="Allowed origins for CORS",
-    )
-
-    @field_validator("cors_origins")
-    @classmethod
-    def parse_cors_origins(cls, v):
-        if isinstance(v, str):
-            return [item.strip() for item in v.split(",")]
-        return v
 
     # Database Settings
     supabase_url: str = Field(
@@ -54,6 +40,23 @@ class Settings(BaseSettings):
         description="Supabase JWT Secret"
     )
 
+    # HubSpot Settings
+    hubspot_app_id: str = Field(
+        default=os.getenv("HUBSPOT_APP_ID", ""),
+        description="This is your app's unique ID. You'll need it to make certain API calls."
+    )
+    hubspot_client_id: str = Field(
+        default=os.getenv("HUBSPOT_CLIENT_ID", ""),
+        description="This ID is unique to your app and is used for initiating OAuth."
+    )
+    hubspot_client_secret: str = Field(
+        default=os.getenv("HUBSPOT_CLIENT_SECRET", ""),
+        description="Used to establish and refresh OAuth authentication."
+    )
+    hubspot_redirect_uri: str = Field(
+        default=os.getenv("HUBSPOT_REDIRECT_URI", ""),
+        description="The URI to redirect to after OAuth flow is complete."
+    )
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

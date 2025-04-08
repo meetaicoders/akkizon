@@ -84,3 +84,12 @@ class OrganizationWithRole(BaseModel):
             return v
         except ValueError:
             raise ValueError(f"Invalid UUID format: {v}")
+
+class UserProfile(BaseModel):
+    id: str
+    name: Optional[str] = None
+    default_organization: Optional[str] = None
+    created_at: Optional[datetime] = None
+class AddUserProfile(BaseModel):
+    user_name: str
+

@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, Body, HTTPException
+from fastapi import APIRouter, Depends, Body, HTTPException, Request
 from modules.authentication.helpers import (
     get_authenticated_user, 
     get_authenticated_user_without_org, 
     get_organization_handler,
-    get_auth_handler
+    get_auth_handler,
+    get_profile_client
 )
 from modules.authentication.schemas import (
     AuthenticatedUser,
-    Organization
+    Organization,
+    AddUserProfile
 )
 
 router = APIRouter()
@@ -19,16 +21,22 @@ def verify_user(user: AuthenticatedUser = Depends(get_authenticated_user)):
 @router.post("/add-organization")
 def add_organization(
     user: AuthenticatedUser = Depends(get_authenticated_user_without_org),
-    organization: Organization = Body(...)
+    organization: Organization = Body(...),
+    profile: AddUserProfile = Body(...)
 ):
     try:
+        print(profile)
         organization_handler = get_organization_handler()
+        profile_client = get_profile_client()
         new_organization = organization_handler.generate_organization_for_user(user, organization)
+        if new_organization.id:
+            profile_client.add_user_profile(user.user_id, profile.user_name, new_organization.id)
         return new_organization
+    
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/get-user-organizations")
+@router.get("/get-user-organizations")
 def get_user_organizations(
     user: AuthenticatedUser = Depends(get_authenticated_user_without_org)
 ):
@@ -47,3 +55,10 @@ def sign_in(
     auth_handler = get_auth_handler().auth_client.sign_in(email=email, password=password)
     return auth_handler
     
+@router.get("/fetch-user-profile")
+def fetch_user_profile(
+    user: AuthenticatedUser = Depends(get_authenticated_user_without_org)
+):
+    profile_client = get_profile_client()
+    profile = profile_client.fetch_user_profile(user.user_id)
+    return profile
