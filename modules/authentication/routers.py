@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Body, HTTPException, Request
+from fastapi.responses import JSONResponse
 from modules.authentication.helpers import (
     get_authenticated_user, 
     get_authenticated_user_without_org, 
@@ -9,7 +10,7 @@ from modules.authentication.helpers import (
 from modules.authentication.schemas import (
     AuthenticatedUser,
     Organization,
-    AddUserProfile
+    Profile
 )
 
 router = APIRouter()
@@ -22,15 +23,14 @@ def verify_user(user: AuthenticatedUser = Depends(get_authenticated_user)):
 def add_organization(
     user: AuthenticatedUser = Depends(get_authenticated_user_without_org),
     organization: Organization = Body(...),
-    profile: AddUserProfile = Body(...)
+    profile: Profile = Body(...)
 ):
     try:
-        print(profile)
         organization_handler = get_organization_handler()
         profile_client = get_profile_client()
         new_organization = organization_handler.generate_organization_for_user(user, organization)
         if new_organization.id:
-            profile_client.add_user_profile(user.user_id, profile.user_name, new_organization.id)
+            profile_client.update_default_organization(user.user_id, profile.name, new_organization.name)
         return new_organization
     
     except Exception as e:
@@ -62,3 +62,12 @@ def fetch_user_profile(
     profile_client = get_profile_client()
     profile = profile_client.fetch_user_profile(user.user_id)
     return profile
+
+@router.post("/update-default-organization")
+def update_default_organization(
+    user: AuthenticatedUser = Depends(get_authenticated_user_without_org),
+    profile: Profile = Body(...)
+):
+    profile_client = get_profile_client()
+    profile_client.update_default_organization(user.user_id, profile.name, profile.default_organization)
+    return JSONResponse(content={"message": "Default organization updated successfully"})
