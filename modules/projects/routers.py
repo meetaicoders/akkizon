@@ -34,6 +34,9 @@ async def add_project(
             user.organization_id
         )
         return response[0]
+    except ValueError as e:
+        logger.error(f"Failed to add project: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to add project: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
