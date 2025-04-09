@@ -31,9 +31,16 @@ class ProjectClient:
         try:
             if not project_id or not user_id or not organization_id:
                 raise ValueError("Missing required fields")
+            
+            # Check if the project already exists
+            existing_project = self.fetch_project_by_id(project_id, user_id, organization_id)
+            if existing_project:
+                raise ValueError(f"Project with id {project_id} already exists.")
+            
             if not project_name:
                 logger.info(f"Project name is not provided, generating random name")
                 project_name = self._generate_random_name(user_id, organization_id)
+            
             logger.info(f"Adding project: {project_name} for user: {user_id} and organization: {organization_id}")
             response = self.client.table(self.table_name).insert({
                 "id": project_id,
