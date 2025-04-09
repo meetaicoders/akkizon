@@ -85,11 +85,18 @@ class OrganizationWithRole(BaseModel):
         except ValueError:
             raise ValueError(f"Invalid UUID format: {v}")
 
-class UserProfile(BaseModel):
-    id: str
+class Profile(BaseModel):
+    id: Optional[str] = None
     name: Optional[str] = None
     default_organization: Optional[str] = None
     created_at: Optional[datetime] = None
-class AddUserProfile(BaseModel):
-    user_name: str
-
+    
+    @field_validator('id')
+    def validate_uuid(cls, v):
+        if v is not None:
+            try:
+                UUID(v)
+                return v
+            except ValueError:
+                raise ValueError(f"Invalid UUID format: {v}")
+        return v

@@ -28,7 +28,7 @@ from modules.authentication.schemas import (
     APIKey,
     BearerToken,
     OrganizationWithRole,
-    UserProfile,
+    Profile
 )
 
 logger = setup_logger(__name__)
@@ -180,7 +180,7 @@ class OrganizationClient:
         except Exception as e:
             logger.error(f"Failed to add user to organization: {str(e)}", exc_info=True)
             raise
-    
+        
     def generate_api_key(self, user: AuthenticatedUser, organization: Organization) -> APIKey:
         """Generate an API key for the user in the specified organization."""
         logger.info(f"Generating API key for {user.user_id}")
@@ -481,14 +481,21 @@ class ProfileClient:
         self.client = client
         self.table_name = table_name
 
-    def fetch_user_profile(self, user_id: str) -> UserProfile:
+    def fetch_user_profile(self, user_id: str) -> Profile:
         response = self.client.table(self.table_name).select("*").eq("id", user_id).execute()
         return response.data
 
-    def add_user_profile(self, user_id: str, user_name: str, default_organization: str) -> UserProfile:
-        response = self.client.table(self.table_name).insert({
-            "id": user_id,
-            "name": user_name,
-            "default_organization": default_organization
-        }).execute()
+    def update_default_organization(self, user_id: str, user_name: str, default_organization: str) -> Profile:
+        existing_profile = self.client.table(self.table_name).select("*").eq("id", user_id).execute()
+        if existing_profile.data:
+            response = self.client.table(self.table_name).update({
+                "name": user_name,
+                "default_organization": default_organization
+            }).eq("id", user_id).execute()
+        else:
+            response = self.client.table(self.table_name).insert({
+                "id": user_id,
+                "name": user_name,
+                "default_organization": default_organization
+            }).execute()
         return response.data
