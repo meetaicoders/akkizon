@@ -30,7 +30,7 @@ def add_organization(
         profile_client = get_profile_client()
         new_organization = organization_handler.generate_organization_for_user(user, organization)
         if new_organization.id:
-            profile_client.update_default_organization(user.user_id, profile.name, new_organization.name)
+            profile_client.update_default_organization(user.user_id, profile.name, new_organization.id)
         return new_organization
     
     except Exception as e:
